@@ -216,90 +216,68 @@ function initHeroReveal() {
 // MUSIC (Web Audio + visualizer)
 // ──────────────────────────────────────────
 const Music = (function() {
-  let audioCtx, analyser, source, gainNode, bufferSource;
+  let audioCtx, analyser, source, gainNode;
+  let audioElement;
   let isPlaying = false;
-  let audioBuffer = null;
-  let startTime = 0;
-  let pauseOffset = 0;
   let visRAF;
 
   function getCtx() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64;
-      gainNode = audioCtx.createGain();
-      gainNode.gain.value = 0.7;
-      analyser.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-    }
-    return audioCtx;
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.7;
+
+    analyser.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    audioElement = new Audio("assets/music/chirunavvutho.mp3");
+    audioElement.loop = true;
+
+    source = audioCtx.createMediaElementSource(audioElement);
+    source.connect(analyser);
   }
 
-  function generateTone() {
-    // Synthesize a simple melodic motif as stand-in for Chirunavvutho
-    const ctx = getCtx();
-    const duration = 32;
-    const sampleRate = ctx.sampleRate;
-    const buf = ctx.createBuffer(2, sampleRate * duration, sampleRate);
-
-    // Notes for a simple peaceful melody
-    const notes = [392,440,494,523,587,523,494,440,392,350,392,440,523,494,440,392];
-    const noteDur = duration / notes.length;
-
-    for (let ch = 0; ch < 2; ch++) {
-      const data = buf.getChannelData(ch);
-      for (let i = 0; i < data.length; i++) {
-        const t = i / sampleRate;
-        const noteIdx = Math.floor(t / noteDur) % notes.length;
-        const freq = notes[noteIdx];
-        const nextFreq = notes[(noteIdx+1) % notes.length];
-        const noteProgress = (t % noteDur) / noteDur;
-        const blendedFreq = freq + (nextFreq - freq) * Math.max(0, noteProgress - 0.8) * 5;
-        // Fundamental + harmonics
-        const env = Math.min(1, (t % noteDur) * 8) * Math.max(0, 1 - (t % noteDur - noteDur + 0.1) * 20);
-        data[i] = (
-          Math.sin(2 * Math.PI * blendedFreq * t) * 0.35 +
-          Math.sin(2 * Math.PI * blendedFreq * 2 * t) * 0.1 +
-          Math.sin(2 * Math.PI * blendedFreq * 0.5 * t) * 0.08
-        ) * env * 0.3;
-        // Subtle noise for warmth
-        data[i] += (Math.random() - 0.5) * 0.004;
-      }
-    }
-    return buf;
-  }
-
+  return audioCtx;
+}
+  
   function play() {
-    const ctx = getCtx();
-    if (ctx.state === 'suspended') ctx.resume();
-    if (isPlaying) return;
+  const ctx = getCtx();
 
-    if (!audioBuffer) audioBuffer = generateTone();
-
-    bufferSource = ctx.createBufferSource();
-    bufferSource.buffer = audioBuffer;
-    bufferSource.loop = true;
-    bufferSource.connect(analyser);
-    bufferSource.start(0, pauseOffset % audioBuffer.duration);
-    startTime = ctx.currentTime - pauseOffset;
-    isPlaying = true;
-    document.getElementById('musicIcon').textContent = '⏸';
-    startVisualizer();
+  if (ctx.state === "suspended") {
+    ctx.resume();
   }
+
+  audioElement.play();
+
+  isPlaying = true;
+
+  document.getElementById("musicIcon").textContent = "⏸";
+
+  startVisualizer();
+ }
 
   function pause() {
-    if (!isPlaying || !bufferSource) return;
-    pauseOffset = audioCtx.currentTime - startTime;
-    bufferSource.stop();
-    isPlaying = false;
-    document.getElementById('musicIcon').textContent = '▶';
-    stopVisualizer();
-  }
+  if (!audioElement) return;
 
+  audioElement.pause();
+
+  isPlaying = false;
+
+  document.getElementById("musicIcon").textContent = "▶";
+
+  stopVisualizer();
+ }
   function toggle() { isPlaying ? pause() : play(); }
 
-  function setVolume(v) { if (gainNode) gainNode.gain.value = v; }
+  function setVolume(v) {
+  if (audioElement) {
+    audioElement.volume = v;
+  }
+}
 
   // Visualizer
   function startVisualizer() {
